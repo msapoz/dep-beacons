@@ -9,6 +9,8 @@
 import UIKit
 import UserNotifications
 import EstimoteProximitySDK
+import Alamofire
+import SwiftyJSON
 
 enum Identifiers {
   static let clockAction = "CLOCK_ACTION"
@@ -21,12 +23,37 @@ enum ClockAction {
     static let clockOut = "Clock Out"
 }
 
+enum ShiftStatus {
+    static let offShift = "None"
+    static let onShift = "In Progress"
+}
+
+// Device Config
 let deviceToken = "ee816c39305725d9a9d4a5b724466d32863dbd1839a53c47a63bba1e5f1512a3"
 let keyId = "PJ87H27324"
 let teamId = "56HQ8UQ2A5"
 
+// Estimote Cloud Config
 let estimoteCloudAppId = "deputy-beacon-aon"
 let estimoteCloudAppToken = "3d56903985fb1889c44cdd028d9ef5fa"
+
+// Deputy Account Configurations
+let deputyUrl = "https://mikesburgers.na.deputy.com"
+let deputyAccessToken = "3e0745c2316d02c7a0698cc313d39a7e"
+let deputyEmployeeId = 1
+let deputyOpUnitId = 3
+var deputyTimesheetId = 0
+
+// Deputy URI's
+let deputyEmpShiftInfoUri = "/api/v1/supervise/empshiftinfo/"
+let deputyStartShiftUri = "/api/v1/supervise/timesheet/start"
+let deputyEndShiftUri = "/api/v1/supervise/timesheet/end"
+
+// HTTP Header
+let headers: HTTPHeaders = [
+    "Authorization": "Bearer \(deputyAccessToken)",
+    "Accept": "application/json"
+]
 
 @UIApplicationMain
 class AppDelegate: UIResponder, UIApplicationDelegate {
@@ -63,14 +90,33 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
             /*
                 GET Deputy user clock status
                 User is clocked in: notificationMessage = "Another day, another dollar, please clock in!", button = ClockAction.clockIn
-                User is clicked out: notificationMessage = Excellent work today, don't forget to clock out!", button = clockAction.clockOut
+                User is clicked out: notificationMessage = Excellent work today, don't forget to clock out!", button = clockAction.clockOut, store repsonse.Object.Id in deputyTimesheetId
             */
             
-            let notificationMessage = "Welcome to another day at work, please clock in!"
-            let clockingButton = ClockAction.clockIn
+            var notificationMessage = "Another day, another dollar, please clock in!"
+            var clockingButton = ClockAction.clockIn
             
-            let businessName = context.attachments["business"] ?? "DefaultBusiness"
-            self.sendLocationNotification(businessName: businessName, message: notificationMessage, clockingButton: clockingButton)
+            let url = deputyUrl + deputyEmpShiftInfoUri + String(deputyEmployeeId)
+            AF.request(url, headers: headers).responseJSON { response in
+                if response.data != nil {
+                    let json = try! JSON(data: response.data!)
+                    let shiftStatus = json["Status"]
+                    if shiftStatus.string == ShiftStatus.onShift {
+                        
+                        // Grab Timesheet ID from the payload
+                        deputyTimesheetId = json["Object"]["Id"].int!
+                        notificationMessage = "Excellent work today, don't forget to clock out!"
+                        clockingButton = ClockAction.clockOut
+                    }
+                    
+                    print("Timesheet ID:", deputyTimesheetId)
+                    print("notification message:", notificationMessage)
+                    print("Clocking Button:", clockingButton)
+                    
+                    let businessName = context.attachments["business"] ?? "DefaultBusiness"
+                    self.sendLocationNotification(businessName: businessName, message: notificationMessage, clockingButton: clockingButton)
+                }
+            }
         }
         zone.onExit = { context in
             print("Leaving area...")
@@ -159,17 +205,37 @@ extension AppDelegate: UNUserNotificationCenterDelegate {
            
         let userInfo = response.notification.request.content.userInfo
         let clockAction = userInfo["ACTION"] as! String
-        print("Clock Action:", clockAction)
         
         // Perform the task associated with the action.
         switch response.actionIdentifier {
         case Identifiers.clockAction:
             print ("Performing Clocking Action...")
-            /*
-                POST to Deputy
-                clockAction is Clock In: POST to START
-                clockAction is Clock Out: POST TO STOP
-            */
+            
+            if clockAction == ClockAction.clockIn {
+                
+                let url = deputyUrl + deputyStartShiftUri
+                let payload = [
+                    "intEmployeeId": deputyEmployeeId,
+                    "intOpunitId": deputyOpUnitId
+                ]
+        
+                AF.request(url, method: .post, parameters: payload, encoder: JSONParameterEncoder.default, headers: headers).response { response in
+                    print("Clock In Response:", response)
+                }
+                
+            } else {
+                
+                let url = deputyUrl + deputyEndShiftUri
+                let payload = [
+                    "intTimesheetId": deputyTimesheetId,
+                    "intMealbreakMinute": 0
+                ]
+        
+                AF.request(url, method: .post, parameters: payload, encoder: JSONParameterEncoder.default, headers: headers).response { response in
+                    print("Clock Out Response:", response)
+                }
+            }
+            
             break
             
         case Identifiers.dismissAction:

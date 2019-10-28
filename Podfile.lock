@@ -1,20 +1,28 @@
 PODS:
+  - Alamofire (5.0.0-rc.3)
   - EstimoteBluetoothScanning (1.0.7)
   - EstimoteProximitySDK (1.5.0):
     - EstimoteBluetoothScanning (~> 1.0.6)
+  - SwiftyJSON (4.3.0)
 
 DEPENDENCIES:
+  - Alamofire (~> 5.0.0-rc.3)
   - EstimoteProximitySDK
+  - SwiftyJSON (~> 4.0)
 
 SPEC REPOS:
   trunk:
+    - Alamofire
     - EstimoteBluetoothScanning
     - EstimoteProximitySDK
+    - SwiftyJSON
 
 SPEC CHECKSUMS:
+  Alamofire: ca8c0de6906873be89d6deec5c8de279e00bf872
   EstimoteBluetoothScanning: 02ac879b204a1c7aadf5090cde137cc7e74f86bc
   EstimoteProximitySDK: b8b4d96ed872431e7941863d009bb99d28ceaf99
+  SwiftyJSON: 6faa0040f8b59dead0ee07436cbf76b73c08fd08
 
-PODFILE CHECKSUM: b00a43834bd000bfa77eb1f26678ef7bd3463a10
+PODFILE CHECKSUM: 27aa20ed4cd17d854ff70978177975c243624566
 
 COCOAPODS: 1.8.4
