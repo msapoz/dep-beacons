@@ -36,8 +36,8 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     var proximityObserver: ProximityObserver!
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
-        registerForPushNotifications()
-      
+//        registerForPushNotifications()
+        
         // Setup Estimote Cloud credentials and establish the connection
         let cloudCredentials = CloudCredentials(appID: estimoteCloudAppId, appToken: estimoteCloudAppToken)
         self.proximityObserver = ProximityObserver(
@@ -49,14 +49,18 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         // Configure proximity zone and enter/exit actions
         let zone = ProximityZone(tag: "worklocation", range: .near)
         zone.onEnter = { context in
+            
+            print("Entered area...")
+            
+            // Query Deputy for user's clock-in status to determine action
+            let notificationMessage = "Welcome to another day at work, please clock in!"
+            
             print("Sending welcome...")
             let businessName = context.attachments["business"] ?? "DefaultBusiness"
-            self.sendLocationNotification(businessName: businessName, message: "Welcome to another day at work!", clockingButton: ClockingAction.clockIn)
+            self.sendLocationNotification(businessName: businessName, message: notificationMessage, clockingButton: ClockingAction.clockIn)
         }
         zone.onExit = { context in
-            print("Sending goodbye...")
-            let businessName = context.attachments["business"] ?? "DefaultBusiness"
-            self.sendLocationNotification(businessName: businessName, message: "Goodbye!", clockingButton: ClockingAction.clockOut)
+            print("Leaving area...")
         }
         
         // Begin beacon observing
@@ -64,6 +68,33 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         
         // Override point for customization after application launch.
         return true
+    }
+    
+    func sendLocationNotification(businessName: String, message: String, clockingButton: String) {
+        
+        print("Sending Local Notification...")
+        
+        // Setup Notification message
+        let content = UNMutableNotificationContent()
+        content.title = businessName
+        content.body = message
+        
+        // Setup Notification Interval
+        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 0.1, repeats: false)
+        let request = UNNotificationRequest(identifier: "notification.id.01", content: content, trigger: trigger)
+        
+        // Setup button action
+        let viewAction = UNNotificationAction(identifier: Identifiers.viewAction, title: clockingButton, options: [.foreground])
+        let clockingCategory = UNNotificationCategory(identifier: Identifiers.clockingCategory, actions: [viewAction], intentIdentifiers: [], options: [])
+        
+//        if clockingButton == ClockingAction.clockIn {
+//
+//        } else if clockingButton == ClockingAction.clockOut {
+//
+//        }
+
+        UNUserNotificationCenter.current().setNotificationCategories([clockingCategory])
+        UNUserNotificationCenter.current().add(request, withCompletionHandler: nil)
     }
 
     // MARK: UISceneSession Lifecycle
@@ -90,55 +121,30 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         }
     }
     
-    func registerForPushNotifications() {
-        UNUserNotificationCenter.current()
-          .requestAuthorization(options: [.alert, .sound, .badge]) {
-          [weak self] granted, error in
-          print("Permission granted: \(granted)")
-            
-          guard granted else { return }
-        
-          // 1
-          let viewAction = UNNotificationAction(
-            identifier: Identifiers.viewAction, title: "Clock-In",
-            options: [.foreground])
-
-          // 2
-          let clockingCategory = UNNotificationCategory(
-            identifier: Identifiers.clockingCategory, actions: [viewAction],
-            intentIdentifiers: [], options: [])
-
-          // 3
-          UNUserNotificationCenter.current().setNotificationCategories([clockingCategory])
-
-          self?.getNotificationSettings()
-      }
-    }
-    
-    func sendLocationNotification(businessName: String, message: String, clockingButton: String) {
-        
-        // Setup Notification message
-        let content = UNMutableNotificationContent()
-        content.title = businessName
-        content.body = message
-        
-        // Setup Notification Interval
-        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 0.5, repeats: false)
-        let request = UNNotificationRequest(identifier: "notification.id.01", content: content, trigger: trigger)
-        
-        // Setup button action
-        let viewAction = UNNotificationAction(identifier: Identifiers.viewAction, title: clockingButton, options: [.foreground])
-        let clockingCategory = UNNotificationCategory(identifier: Identifiers.clockingCategory, actions: [viewAction], intentIdentifiers: [], options: [])
-        
-//        if clockingButton == ClockingAction.clockIn {
+//    func registerForPushNotifications() {
+//        UNUserNotificationCenter.current()
+//          .requestAuthorization(options: [.alert, .sound, .badge]) {
+//          [weak self] granted, error in
+//          print("Permission granted: \(granted)")
 //
-//        } else if clockingButton == ClockingAction.clockOut {
+//          guard granted else { return }
 //
-//        }
-          
-        UNUserNotificationCenter.current().add(request, withCompletionHandler: nil)
-        UNUserNotificationCenter.current().setNotificationCategories([clockingCategory])
-    }
+//          // 1
+//          let viewAction = UNNotificationAction(
+//            identifier: Identifiers.viewAction, title: "Clock-In",
+//            options: [.foreground])
+//
+//          // 2
+//          let clockingCategory = UNNotificationCategory(
+//            identifier: Identifiers.clockingCategory, actions: [viewAction],
+//            intentIdentifiers: [], options: [])
+//
+//          // 3
+//          UNUserNotificationCenter.current().setNotificationCategories([clockingCategory])
+//
+//          self?.getNotificationSettings()
+//      }
+//    }
     
     func application(
       _ application: UIApplication,
