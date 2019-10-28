@@ -11,7 +11,8 @@ import UserNotifications
 import EstimoteProximitySDK
 
 enum Identifiers {
-  static let viewAction = "CLOCK_IDENTIFIER"
+  static let clockAction = "CLOCK_ACTION"
+  static let dismissAction = "DISMISS_ACTION"
   static let clockCategory = "CLOCK_CATEGORY"
 }
 
@@ -27,7 +28,6 @@ let teamId = "56HQ8UQ2A5"
 let estimoteCloudAppId = "deputy-beacon-aon"
 let estimoteCloudAppToken = "3d56903985fb1889c44cdd028d9ef5fa"
 
-
 @UIApplicationMain
 class AppDelegate: UIResponder, UIApplicationDelegate {
   
@@ -36,13 +36,15 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     var proximityObserver: ProximityObserver!
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
-        registerForPushNotifications()
         
+        // Authorize phone to receive push notifications
         UNUserNotificationCenter.current()
           .requestAuthorization(options: [.alert, .sound, .badge]) {
           [weak self] granted, error in
           print("Permission granted: \(granted)")
         }
+        
+        UNUserNotificationCenter.current().delegate = self
         
         // Setup Estimote Cloud credentials and establish the connection
         let cloudCredentials = CloudCredentials(appID: estimoteCloudAppId, appToken: estimoteCloudAppToken)
@@ -58,21 +60,20 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
             
             print("Entered area...")
             
-            // Query Deputy for user's clock-in status to determine action
-            let notificationMessage = "Welcome to another day at work, please clock in!"
+            /*
+                GET Deputy user clock status
+                User is clocked in: notificationMessage = "Another day, another dollar, please clock in!", button = ClockAction.clockIn
+                User is clicked out: notificationMessage = Excellent work today, don't forget to clock out!", button = clockAction.clockOut
+            */
             
-            print("Sending welcome...")
+            let notificationMessage = "Welcome to another day at work, please clock in!"
+            let clockingButton = ClockAction.clockIn
+            
             let businessName = context.attachments["business"] ?? "DefaultBusiness"
-            self.sendLocationNotification(businessName: businessName, message: notificationMessage, clockingButton: ClockAction.clockIn)
+            self.sendLocationNotification(businessName: businessName, message: notificationMessage, clockingButton: clockingButton)
         }
         zone.onExit = { context in
             print("Leaving area...")
-            
-            // Query Deputy for user's clock-in status to determine action
-                       let notificationMessage = "Goodbye please clock out!"
-                       
-                       let businessName = context.attachments["business"] ?? "DefaultBusiness"
-            self.sendLocationNotification(businessName: businessName, message: notificationMessage, clockingButton: ClockAction.clockOut)
         }
         
         // Begin beacon observing
@@ -84,26 +85,28 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     
     func sendLocationNotification(businessName: String, message: String, clockingButton: String) {
         
-        print("Sending Local Notification...")
+        print("Sending Notification...")
         
         // Setup Notification message
         let content = UNMutableNotificationContent()
         content.title = businessName
         content.body = message
         content.categoryIdentifier = Identifiers.clockCategory
+        content.userInfo = ["ACTION" : clockingButton]
         
         // Setup Notification Interval
         let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 1, repeats: false)
         let request = UNNotificationRequest(identifier: "notification.id.01", content: content, trigger: trigger)
         
-        // Setup button action
-        let viewAction = UNNotificationAction(identifier: Identifiers.viewAction, title: clockingButton, options: [.foreground])
-        let clockCategory = UNNotificationCategory(identifier: Identifiers.clockCategory, actions: [viewAction], intentIdentifiers: [], options: [])
-        
+        // Setup button actions
+        let clockAction = UNNotificationAction(identifier: Identifiers.clockAction, title: clockingButton, options: [.foreground])
+        let dismissAction = UNNotificationAction(identifier: Identifiers.dismissAction, title: "Dismiss", options: [.foreground])
+        let clockCategory = UNNotificationCategory(identifier: Identifiers.clockCategory, actions: [clockAction, dismissAction], intentIdentifiers: [], options: [])
+                
         UNUserNotificationCenter.current().setNotificationCategories([clockCategory])
         UNUserNotificationCenter.current().add(request, withCompletionHandler: nil)
     }
-
+        
     // MARK: UISceneSession Lifecycle
 
     func application(_ application: UIApplication, configurationForConnecting connectingSceneSession: UISceneSession, options: UIScene.ConnectionOptions) -> UISceneConfiguration {
@@ -128,31 +131,6 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         }
     }
     
-    func registerForPushNotifications() {
-        UNUserNotificationCenter.current()
-          .requestAuthorization(options: [.alert, .sound, .badge]) {
-          [weak self] granted, error in
-          print("Permission granted: \(granted)")
-
-          guard granted else { return }
-
-          // 1
-          let viewAction = UNNotificationAction(
-            identifier: Identifiers.viewAction, title: "Clock-In",
-            options: [.foreground])
-
-          // 2
-          let clockingCategory = UNNotificationCategory(
-            identifier: Identifiers.clockCategory, actions: [viewAction],
-            intentIdentifiers: [], options: [])
-
-          // 3
-          UNUserNotificationCenter.current().setNotificationCategories([clockingCategory])
-
-          self?.getNotificationSettings()
-      }
-    }
-    
     func application(
       _ application: UIApplication,
       didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data
@@ -166,6 +144,44 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
       _ application: UIApplication,
       didFailToRegisterForRemoteNotificationsWithError error: Error) {
       print("Failed to register: \(error)")
+    }
+}
+
+extension AppDelegate: UNUserNotificationCenterDelegate {
+    // Handle push notification actions
+    
+    func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        didReceive response: UNNotificationResponse,
+        withCompletionHandler completionHandler: @escaping () -> Void) {
+        
+        print("Inside notification delgate")
+           
+        let userInfo = response.notification.request.content.userInfo
+        let clockAction = userInfo["ACTION"] as! String
+        print("Clock Action:", clockAction)
+        
+        // Perform the task associated with the action.
+        switch response.actionIdentifier {
+        case Identifiers.clockAction:
+            print ("Performing Clocking Action...")
+            /*
+                POST to Deputy
+                clockAction is Clock In: POST to START
+                clockAction is Clock Out: POST TO STOP
+            */
+            break
+            
+        case Identifiers.dismissAction:
+            print ("Performing Dismiss Action...")
+            break
+            
+        default:
+            break
+       }
+        
+       // Always call the completion handler when done.
+       completionHandler()
     }
 }
 
