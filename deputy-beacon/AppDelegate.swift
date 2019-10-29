@@ -87,12 +87,6 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
             
             print("Entered area...")
             
-            /*
-                GET Deputy user clock status
-                User is clocked in: notificationMessage = "Another day, another dollar, please clock in!", button = ClockAction.clockIn
-                User is clicked out: notificationMessage = Excellent work today, don't forget to clock out!", button = clockAction.clockOut, store repsonse.Object.Id in deputyTimesheetId
-            */
-            
             var notificationMessage = "Another day, another dollar, please clock in!"
             var clockingButton = ClockAction.clockIn
             
@@ -102,7 +96,6 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
                     let json = try! JSON(data: response.data!)
                     let shiftStatus = json["Status"]
                     if shiftStatus.string == ShiftStatus.onShift {
-                        
                         // Grab Timesheet ID from the payload
                         deputyTimesheetId = json["Object"]["Id"].int!
                         notificationMessage = "Excellent work today, don't forget to clock out!"
@@ -212,7 +205,6 @@ extension AppDelegate: UNUserNotificationCenterDelegate {
             print ("Performing Clocking Action...")
             
             if clockAction == ClockAction.clockIn {
-                
                 let url = deputyUrl + deputyStartShiftUri
                 let payload = [
                     "intEmployeeId": deputyEmployeeId,
@@ -224,7 +216,6 @@ extension AppDelegate: UNUserNotificationCenterDelegate {
                 }
                 
             } else {
-                
                 let url = deputyUrl + deputyEndShiftUri
                 let payload = [
                     "intTimesheetId": deputyTimesheetId,
